@@ -29,11 +29,11 @@ class NewsParserPipeline(object):
     def process_item(self, item, spider):
         if spider.name == "vk":
             self.db.cur.execute(re.sub(r"(\s)+", " ", """
-                    INSERT INTO main.t_vk_posts(nday, ntime, msg)
-                    VALUES (:p_nday, :p_ntime, :p_msg)
+                    INSERT INTO main.t_vk_posts(part, ntime, msg)
+                    VALUES (:p_part, :p_ntime, :p_msg)
                 """),
                 {
-                    "p_nday": item["nday"],
+                    "p_part": item["part"],
                     "p_ntime": item["ntime"],
                     "p_msg": item["msg"]
                 }
@@ -45,16 +45,16 @@ class NewsParserPipeline(object):
     def _get_last_record_ids(self, spider):
         if spider.name == "vk":
             self.db.cur.execute(re.sub(r"(\s)+", " ", """
-                SELECT v.last_nday
+                SELECT v.last_part
                      , max(ntime) as last_ntime
                   FROM t_vk_posts tbl
-                 INNER JOIN (SELECT max(nday) as last_nday
+                 INNER JOIN (SELECT max(part) as last_part
                                FROM t_vk_posts) v
-                    ON tbl.nday = v.last_nday
+                    ON tbl.part = v.last_part
             """))
 
             record = self.db.cur.fetchone()
-            spider.last_nday = int(record[0] or 0)
+            spider.last_part = int(record[0] or 0)
             spider.last_ntime = int(record[1] or 0)
 
 

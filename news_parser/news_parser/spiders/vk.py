@@ -5,8 +5,8 @@ import re
 class VKSpider(scrapy.Spider):
     name = "vk"
     start_urls = ["https://m.vk.com/sber.sluh"]
-    last_nday = None or 0
-    last_ntime = None or 0
+    last_part = None
+    last_ntime = None
 
     def parse(self, response):
         completed = False
@@ -15,17 +15,18 @@ class VKSpider(scrapy.Spider):
         for post in posts:
             post_id = post.css("a.post__anchor.anchor::attr(name)")[0].get()
 
-            nday, ntime = post_id.replace("-", "_").split("_")[1:]
+            dt = post_id.replace("-", "_").split("_")[1:]
+            part, ntime = int(dt[0]), int(dt[1])
             msg = re.sub(r"(\s)+", " ", re.sub(r"<[^<]+>", "",
                 post.css("div.wi_body div.pi_text").get() or "").strip()
             )
 
-            completed = int(nday) < self.last_nday or (int(nday) == self.last_nday and int(ntime) <= self.last_ntime)
+            completed = part < self.last_part or (part == self.last_part and ntime <= self.last_ntime)
             if completed:
                 break
 
             yield {
-                "nday": nday,
+                "part": part,
                 "ntime": ntime,
                 "msg": msg
             }
