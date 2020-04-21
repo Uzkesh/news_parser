@@ -18,10 +18,10 @@ NEWSPIDER_MODULE = 'news_parser.spiders'
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = 'news_parser (+http://www.yourdomain.com)'
+USER_AGENT = os.environ['USER_AGENT']
 
 # Obey robots.txt rules
-ROBOTSTXT_OBEY = False
+ROBOTSTXT_OBEY = os.environ['ROBOTS_FL']
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 #CONCURRENT_REQUESTS = 32
@@ -29,13 +29,13 @@ ROBOTSTXT_OBEY = False
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-#DOWNLOAD_DELAY = 3
+DOWNLOAD_DELAY = os.environ['DOWNLOAD_DELAY']
 # The download delay setting will honor only one of:
 #CONCURRENT_REQUESTS_PER_DOMAIN = 16
 #CONCURRENT_REQUESTS_PER_IP = 16
 
 # Disable cookies (enabled by default)
-#COOKIES_ENABLED = False
+COOKIES_ENABLED = os.environ['COOKIES_ENABLED']
 
 # Disable Telnet Console (enabled by default)
 #TELNETCONSOLE_ENABLED = False
@@ -92,11 +92,13 @@ ITEM_PIPELINES = {
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
 DB_PARAMS = {
-    "name": "news_parser.sqlite"
+    "host": os.environ['DB_HOST'],
+    "port": os.environ['DB_PORT'],
+    "name": os.environ['DB_NAME'],
+    "user": os.environ['DB_USER'],
+    "password": os.environ['DB_PASSWORD'],
 }
 
-# RETRY_HTTP_CODES = [429]
-# DOWNLOADER_MIDDLEWARES = {
-#     'scrapy.downloadermiddlewares.retry.RetryMiddleware': None,
-#     'news_parser.middlewares.TooManyRequestsRetryMiddleware': 543,
-# }
+SPIDER_URLS = {
+    "bankiru": [os.environ['BANKIRU_SPIDER_URL']],
+}

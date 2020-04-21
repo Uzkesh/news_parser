@@ -1,26 +1,23 @@
 from typing import Optional
-from .types import TypeDBParams
-import sqlite3
-
-
-class DBException(Exception):
-    pass
+from .types import DBParamsDTO
+import psycopg2
 
 
 class DB:
-    _db: Optional[sqlite3.Connection] = None
-    cur: Optional[sqlite3.Cursor] = None
-
-    def __init__(self, params: TypeDBParams):
+    def __init__(self, params: DBParamsDTO):
+        self._db: Optional[psycopg2._psycopg.connection] = None
+        self.cur: Optional[psycopg2._psycopg.cursor] = None
         self.connect(params)
 
-    def connect(self, params: TypeDBParams):
-        try:
-            self._db = sqlite3.connect(params.name)
-            self.cur = self._db.cursor()
-        except sqlite3.DatabaseError as e:
-            self._db, self.cur = None, None
-            raise DBException(str(e))
+    def connect(self, params: DBParamsDTO):
+        self._db = psycopg2.connect(
+            host=params.host,
+            port=params.port,
+            dbname=params.name,
+            user=params.user,
+            password=params.password
+        )
+        self.cur = self._db.cursor()
 
     def disconnect(self):
         self.cur.close()
