@@ -1,15 +1,27 @@
+from news_parser.settings import SPIDER_URLS
 import scrapy
 import re
 
 
 class VKSpider(scrapy.Spider):
     name = "vk"
-    start_urls = ["https://m.vk.com/sber.sluh"]
-    last_part = None
-    last_ntime = None
+    start_urls = SPIDER_URLS[name]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.last_part = None
+        self.last_ntime = None
+        self.completed = False
+
+    def last_post_id(self, post_id: str):
+        if post_id == "0":
+            self.last_part, self.last_ntime = 0, 0
+        else:
+            cnt = int(post_id[-1])
+            self.last_part = int(post_id[:cnt])
+            self.last_ntime = int((post_id[cnt:])[:-1])
 
     def parse(self, response):
-        completed = False
         posts = response.css("div.wall_item")
 
         for post in posts:
@@ -21,8 +33,8 @@ class VKSpider(scrapy.Spider):
                 post.css("div.wi_body div.pi_text").get() or "").strip()
             )
 
-            completed = part < self.last_part or (part == self.last_part and ntime <= self.last_ntime)
-            if completed:
+            self.completed = part < self.last_part or (part == self.last_part and ntime <= self.last_ntime)
+            if self.completed:
                 break
 
             yield {
@@ -31,7 +43,7 @@ class VKSpider(scrapy.Spider):
                 "msg": msg
             }
 
-        yield from dict() if completed else response.follow_all(
+        yield from dict() if self.completed else response.follow_all(
             css="div.wall_posts div.show_more_wrap a",
             callback=self.parse
         )

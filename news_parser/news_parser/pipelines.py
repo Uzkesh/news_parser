@@ -27,6 +27,7 @@ class NewsParserPipeline(object):
 
     @classmethod
     def from_crawler(cls, crawler):
+        # TODO: Перенести подлючение к БД в middleware, а не для каждого паука отдельно !!!
         db_params = crawler.settings.getdict("DB_PARAMS")
         return cls(DBParamsDTO(
             host=db_params["host"],
@@ -40,7 +41,12 @@ class NewsParserPipeline(object):
         self.db = DB(self._params)
         self._source_id = int(self._get_source_id(spider.name))
         self._post_types = self._get_types_id()
-        self._get_last_record_id(spider)
+        # TODO: Получать последний сохраненный ID поста
+        # TODO: Добавить параметризованный запуск паука из командной строки:
+        # TODO: Только новые посты; Добавление новых и обновление существующих до определенной даты; Добавление новых до определенной даты.
+
+        # spider.last_post_id("0")
+        # spider.last_post_id(self._get_last_post_id())
 
     def close_spider(self, spider):
         self.db.disconnect()
@@ -67,7 +73,7 @@ class NewsParserPipeline(object):
                 #     }
                 # )
 
-            elif spider.name == "bankiru":
+            elif spider.name == "bankiru" or spider.name == "bankiru_clients" or spider.name == "pikabu":
                 # try:
                     self._save_post_info(
                         parent_id=None,
@@ -121,42 +127,24 @@ class NewsParserPipeline(object):
             except PipelineException as e:
                 print(str(e))
 
-    def _get_last_record_id(self, spider):
+    def _get_last_post_id(self):
         """
         Получить последний external_post_id текущего ресурса
-        :param spider:
         :return:
         """
-        if spider.name == "vk":
-            self.db.cur.execute(
-                RegExp.space.sub(" ", """
-                    SELECT v.last_part
-                         , max(ntime) as last_ntime
-                      FROM t_vk_posts tbl
-                     INNER JOIN (SELECT max(part) as last_part
-                                   FROM t_vk_posts) v
-                        ON tbl.part = v.last_part
-                """)
-            )
-            record = self.db.cur.fetchone()
-            spider.last_part = int(record[0] or 0)
-            spider.last_ntime = int(record[1] or 0)
-            # int(f"{part}{ntime}{len(part)}")
-
-        elif spider.name == "bankiru":
-            self.db.cur.execute(
-                RegExp.space.sub(" ", """
-                    SELECT max(external_post_id) as last_record_id
-                      FROM t_post_info
-                     WHERE     ref_source_id = %(p_source_id)s
-                           AND ref_type_id = %(p_type_id)s
-                """),
-                {
-                    "p_source_id": self._source_id,
-                    "p_type_id": self._post_types.post
-                }
-            )
-            spider.last_record_id = int(self.db.cur.fetchone()[0] or 0)
+        self.db.cur.execute(
+            RegExp.space.sub(" ", """
+                SELECT max(external_post_id) as last_post_id
+                  FROM t_post_info
+                 WHERE     ref_source_id = %(p_source_id)s
+                       AND ref_type_id = %(p_type_id)s
+            """),
+            {
+                "p_source_id": self._source_id,
+                "p_type_id": self._post_types.post
+            }
+        )
+        return self.db.cur.fetchone()[0] or "0"
 
     def _get_source_id(self, source_code: str):
         _etag = str(NewsParserPipeline._get_source_id.__qualname__)
@@ -229,12 +217,14 @@ class NewsParserPipeline(object):
     def _add_post_info(self, parent_id: Optional[int], user_id: int, post_type: int, item: Union[PostBankiru, CommentBankiru]):
         _etag = str(NewsParserPipeline._add_post_info.__qualname__)
 
+        # TODO: Добавить тег - URL-поста
         # Формирование json для записи в БД в колонку content в зависимости от типа сообщения и ресурса
         type_item = type(item)
         if type_item is PostBankiru:
             content = json.dumps({
+                "post_url": item.get("post_url", None),
                 "title": item["title"],
-                "rating": item["rating"],
+                "rating": item.get("rating", None),
                 "msg": item["msg"],
                 "bank_answer": item["bank_answer"]
             })
@@ -258,7 +248,7 @@ class NewsParserPipeline(object):
                 "p_type_id": post_type,
                 "p_user_id": user_id,
                 "p_content": content,
-                "p_datetime": item["datetime"]
+                "p_datetime": item.get("datetime", None)
             }
         )
         return self.db.cur.fetchone()[0]

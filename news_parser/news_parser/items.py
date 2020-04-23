@@ -15,6 +15,7 @@ class NewsParserItem(scrapy.Item):
 
 
 class PostBankiru(scrapy.Item):
+    post_url = scrapy.Field()
     post_id = scrapy.Field()
     title = scrapy.Field()
     rating = scrapy.Field()

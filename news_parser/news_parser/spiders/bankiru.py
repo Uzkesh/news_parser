@@ -12,8 +12,12 @@ class BankiruSpider(scrapy.Spider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.last_record_id = None
+        self.last_post_id = 11190183
         self.completed = False
+
+    def last_post_id(self, post_id: str):
+        # self.last_post_id = int(post_id)
+        self.last_post_id = 11190183
 
     def parse(self, response):
         main = response.css("main.layout-column-center")
@@ -38,7 +42,7 @@ class BankiruSpider(scrapy.Spider):
         post_id = int(response.url.split("/")[-2])
         bank_answer_id = f"block_text_{post_id}"
 
-        if post_id <= self.last_record_id:
+        if post_id <= self.last_post_id:
             self.completed = True
 
         post = response.css("table.resptab")
@@ -48,8 +52,8 @@ class BankiruSpider(scrapy.Spider):
         title = RegExp.space.sub(" ", post.css("td.headerline::text").get().strip())
         rating = re.search(r"[-−]?[0-9]+", post.css("td.rating nobr::text").get() or "") or post.css("td.rating::text").get()
         rating = RegExp.space.sub(" ", rating.group(0).replace("−", "-") if type(rating) is re.Match else rating).strip()
-        msg = RegExp.space.sub(" ", RegExp.tag.sub("", post.css("td.article-text").get() or "").strip())
-        bank_answer = RegExp.space.sub(" ", RegExp.tag.sub("", post.css(f"[id='{bank_answer_id}']").get() or "").strip())
+        msg = RegExp.space.sub(" ", RegExp.tag.sub(" ", post.css("td.article-text").get() or "").strip())
+        bank_answer = RegExp.space.sub(" ", RegExp.tag.sub(" ", post.css(f"[id='{bank_answer_id}']").get() or "").strip())
         author_uid = author.attrib["href"].split("=")[-1]
         author_login = author.css("::text").get()
         dt = datetime.strptime(response.css("span.color-grey::text").get(), "%d.%m.%Y %H:%M")
@@ -64,7 +68,7 @@ class BankiruSpider(scrapy.Spider):
                 author_uid=comment_author_uid,
                 author_login=comment_author_login,
                 datetime=datetime.strptime(comment.css("div.pressmon::text").get(), "%d.%m.%Y %H:%M"),
-                msg=RegExp.space.sub(" ", RegExp.tag.sub("", comment.css("td.article-text").get()).strip())
+                msg=RegExp.space.sub(" ", RegExp.tag.sub(" ", comment.css("td.article-text").get()).strip())
             ))
 
         yield PostBankiru() if self.completed else PostBankiru(

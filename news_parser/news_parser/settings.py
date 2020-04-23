@@ -100,5 +100,8 @@ DB_PARAMS = {
 }
 
 SPIDER_URLS = {
-    "bankiru": [os.environ['BANKIRU_SPIDER_URL']],
+    "bankiru": [os.environ["BANKIRU_SPIDER_URL"]],
+    "bankiru_clients": ["BANKIRU_CLIENTS_SPIDER_URL"],
+    "pikabu": [os.environ["PIKABU_SPIDER_URL"]],
+    "vk": [os.environ["VK_SPIDER_URL"]]
 }
