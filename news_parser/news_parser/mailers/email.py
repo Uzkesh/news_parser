@@ -42,9 +42,9 @@ class EmailManager:
             fname=fname
         )
 
-        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server = smtplib.SMTP_SSL('smtp.yandex.ru', 465)
         # server.set_debuglevel(True)
-        server.starttls()
+        # server.starttls()
         server.login(addr_from, EMAIL_MANAGER["password"])
         server.send_message(email_body)
         server.quit()
