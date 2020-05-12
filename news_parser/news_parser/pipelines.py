@@ -28,6 +28,7 @@ class NewsParserPipeline(object):
     @classmethod
     def from_crawler(cls, crawler):
         # TODO: Перенести подлючение к БД в middleware, а не для каждого паука отдельно !!!
+        # print("!")
         db_params = crawler.settings.getdict("DB_PARAMS")
         return cls(DBParamsDTO(
             host=db_params["host"],
@@ -38,15 +39,11 @@ class NewsParserPipeline(object):
         ))
 
     def open_spider(self, spider):
+        # TODO: Добавить параметризованный запуск паука из командной строки
         self.db = DB(self._params)
         self._source_id = int(self._get_source_id(spider.name))
         self._post_types = self._get_types_id()
-        # TODO: Получать последний сохраненный ID поста
-        # TODO: Добавить параметризованный запуск паука из командной строки:
-        # TODO: Только новые посты; Добавление новых и обновление существующих до определенной даты; Добавление новых до определенной даты.
-
-        # spider.last_post_id("0")
-        # spider.last_post_id(self._get_last_post_id())
+        spider.set_last_post_id(self._get_last_post_id())
 
     def close_spider(self, spider):
         self.db.disconnect()
@@ -90,27 +87,27 @@ class NewsParserPipeline(object):
         _etag = str(NewsParserPipeline._save_post_info.__qualname__)
 
         # Ищем пользователя
-        user_id = self._get_user_id(
-            uid=item["author_uid"],
-            login=item["author_login"]
+        account_id = self._get_account_id(
+            uid=str(item["author_uid"]),
+            login=str(item["author_login"])
         )
 
         # Создаем запись нового пользователя
-        if user_id is None:
-            user_id = self._add_new_user(
-                uid=item["author_uid"],
-                login=item["author_login"]
+        if account_id is None:
+            account_id = self._add_new_account(
+                uid=str(item["author_uid"]),
+                login=str(item["author_login"])
             )
 
         # Если не удалось найти и добавить пользователя (хз на уровне БД)
-        if user_id is None:
+        if account_id is None:
             raise PipelineException(
                 f"{_etag}.1:Не удалось сохранить информацию о пользователе # [{self._source_id=}, {self._current_post_id=}]: [{item['author_uid']=}, {item['author_login']}]"
             )
 
         record_post_id = self._add_post_info(
             parent_id=parent_id,
-            user_id=int(user_id),
+            account_id=int(account_id),
             post_type=post_type,
             item=item
         )
@@ -125,6 +122,7 @@ class NewsParserPipeline(object):
                     comments=i.get("comments", list())
                 )
             except PipelineException as e:
+                # TODO: Изменить обработку исключения
                 print(str(e))
 
     def _get_last_post_id(self):
@@ -136,15 +134,15 @@ class NewsParserPipeline(object):
             RegExp.space.sub(" ", """
                 SELECT max(external_post_id) as last_post_id
                   FROM t_post_info
-                 WHERE     ref_source_id = %(p_source_id)s
-                       AND ref_type_id = %(p_type_id)s
+                 WHERE     ref_source = %(p_source_id)s
+                       AND ref_type = %(p_type_id)s
             """),
             {
                 "p_source_id": self._source_id,
                 "p_type_id": self._post_types.post
             }
         )
-        return self.db.cur.fetchone()[0] or "0"
+        return self.db.cur.fetchone()[0]
 
     def _get_source_id(self, source_code: str):
         _etag = str(NewsParserPipeline._get_source_id.__qualname__)
@@ -152,7 +150,7 @@ class NewsParserPipeline(object):
         self.db.cur.execute(
             RegExp.space.sub(" ", """
                 SELECT id
-                  FROM t_ref_source
+                  FROM ref_source
                  WHERE code = %(p_code)s
             """),
             {"p_code": source_code}
@@ -169,7 +167,8 @@ class NewsParserPipeline(object):
 
         self.db.cur.execute(RegExp.space.sub(" ", """
             SELECT id, code
-              FROM t_ref_type
+              FROM ref_type
+             WHERE code IN ('post', 'comment')
         """))
 
         for record in self.db.cur:
@@ -180,16 +179,16 @@ class NewsParserPipeline(object):
 
         return DBPostTypesDTO(post=int(post), comment=int(comment))
 
-    def _get_user_id(self, uid: int, login: str):
+    def _get_account_id(self, uid: str, login: str):
         self.db.cur.execute(
             RegExp.space.sub(" ", """
                 SELECT id
-                  FROM t_ref_user
+                  FROM ref_account
                  WHERE     login = %(p_login)s
-                       AND ref_source_id = %(p_source_id)s
+                       AND ref_source = %(p_source_id)s
                        AND (external_uid = %(p_uid)s
                             OR external_uid IS NULL)
-                 ORDER BY coalesce(external_uid, -1) DESC
+                 ORDER BY coalesce(external_uid, '') DESC
             """),
             {
                 "p_login": login,
@@ -199,22 +198,22 @@ class NewsParserPipeline(object):
         )
         return (self.db.cur.fetchone() or [None])[0]
 
-    def _add_new_user(self, uid: int, login: str):
+    def _add_new_account(self, uid: str, login: str):
         self.db.cur.execute(
             RegExp.space.sub(" ", """
-                INSERT INTO t_ref_user(login, external_uid, ref_source_id) 
-                VALUES (%(p_login)s, %(p_uid)s, %(p_source_id)s)
+                INSERT INTO ref_account(external_uid, login, ref_source) 
+                VALUES (%(p_uid)s, %(p_login)s, %(p_source_id)s)
                 RETURNING id
             """),
             {
-                "p_login": login,
                 "p_uid": uid,
+                "p_login": login,
                 "p_source_id": self._source_id
             }
         )
         return self.db.cur.fetchone()[0]
 
-    def _add_post_info(self, parent_id: Optional[int], user_id: int, post_type: int, item: Union[PostBankiru, CommentBankiru]):
+    def _add_post_info(self, parent_id: Optional[int], account_id: int, post_type: int, item: Union[PostBankiru, CommentBankiru]):
         _etag = str(NewsParserPipeline._add_post_info.__qualname__)
 
         # TODO: Добавить тег - URL-поста
@@ -237,8 +236,8 @@ class NewsParserPipeline(object):
 
         self.db.cur.execute(
             RegExp.space.sub(" ", """
-                INSERT INTO t_post_info(parent_id, external_post_id, ref_source_id, ref_type_id, ref_user_id, content, datetime)
-                VALUES (%(p_parent_id)s, %(p_post_id)s, %(p_src_id)s, %(p_type_id)s, %(p_user_id)s, %(p_content)s, %(p_datetime)s)
+                INSERT INTO t_post_info(parent_id, external_post_id, ref_source, ref_type, ref_account, content, datetime)
+                VALUES (%(p_parent_id)s, %(p_post_id)s, %(p_src_id)s, %(p_type_id)s, %(p_account_id)s, %(p_content)s, %(p_datetime)s)
                 RETURNING id
             """),
             {
@@ -246,7 +245,7 @@ class NewsParserPipeline(object):
                 "p_post_id": item.get("post_id", None),
                 "p_src_id": self._source_id,
                 "p_type_id": post_type,
-                "p_user_id": user_id,
+                "p_account_id": account_id,
                 "p_content": content,
                 "p_datetime": item.get("datetime", None)
             }

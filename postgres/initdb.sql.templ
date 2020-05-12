@@ -1,0 +1,81 @@
+CREATE TABLE ref_source
+(
+  id SERIAL PRIMARY KEY,
+  code VARCHAR UNIQUE CHECK (code = lower(trim(code))),
+  name VARCHAR,
+  url VARCHAR
+);
+
+
+CREATE TABLE ref_type
+(
+  id SERIAL PRIMARY KEY,
+  code VARCHAR UNIQUE CHECK (code = lower(trim(code))),
+  name VARCHAR
+);
+
+
+CREATE TABLE ref_account
+(
+  id SERIAL PRIMARY KEY,
+  external_uid VARCHAR,
+  login VARCHAR,
+  ref_source INTEGER REFERENCES ref_source(id) NOT NULL,
+  actual BOOLEAN DEFAULT TRUE,
+  UNIQUE (login, external_uid, ref_source),
+  CHECK (login IS NOT NULL OR external_uid IS NOT NULL)
+);
+
+
+CREATE TABLE ref_account_list
+(
+  id SERIAL PRIMARY KEY,
+  ref_type INTEGER REFERENCES ref_type(id) NOT NULL,  -- (получатели рассылки, источники парсинга)
+  ref_accounts INTEGER[],
+  actual BOOLEAN,
+  UNIQUE (ref_type, ref_accounts)
+);
+
+
+CREATE TABLE t_session
+(
+  id BIGSERIAL PRIMARY KEY,
+  ref_account INTEGER REFERENCES ref_account(id) NOT NULL,
+  datetime TIMESTAMP NOT NULL DEFAULT current_timestamp
+);
+
+
+CREATE TABLE t_post_info
+(
+  id BIGSERIAL PRIMARY KEY,
+  parent_id BIGINT,
+  external_post_id INTEGER,
+  ref_source INTEGER REFERENCES ref_source(id) NOT NULL,
+  ref_type INTEGER REFERENCES ref_type(id) NOT NULL,
+  ref_account BIGINT REFERENCES ref_account(id) NOT NULL,
+  content JSONB,
+  datetime TIMESTAMP,
+  UNIQUE (external_post_id, ref_source)
+);
+
+
+CREATE TABLE t_report
+(
+  id BIGSERIAL PRIMARY KEY,
+  ref_type INTEGER REFERENCES ref_type(id) NOT NULL,
+  ref_posts INTEGER[],
+  fpath VARCHAR,
+  parameters JSONB,
+  datetime TIMESTAMP NOT NULL DEFAULT current_timestamp
+);
+
+
+CREATE TABLE t_report_event
+(
+  id BIGSERIAL PRIMARY KEY,
+  ref_report BIGINT REFERENCES t_report(id) NOT NULL,
+  ref_session BIGINT REFERENCES t_session(id) NOT NULL,
+  ref_recipient_list INTEGER REFERENCES ref_account_list(id) NOT NULL
+);
+
+COMMIT;

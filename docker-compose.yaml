@@ -28,3 +28,6 @@ services:
       - ./news_parser/news_parser.env
     networks:
       - backend
+    depends_on:
+      - pg-news-parser
+    command: ["python", "start.py"]

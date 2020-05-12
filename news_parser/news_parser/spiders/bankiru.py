@@ -12,12 +12,11 @@ class BankiruSpider(scrapy.Spider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.last_post_id = 11190183
+        self.last_post_id = 0
         self.completed = False
 
-    def last_post_id(self, post_id: str):
-        # self.last_post_id = int(post_id)
-        self.last_post_id = 11190183
+    def set_last_post_id(self, post_id: str):
+        self.last_post_id = int(post_id or 11169894)
 
     def parse(self, response):
         main = response.css("main.layout-column-center")
@@ -39,7 +38,8 @@ class BankiruSpider(scrapy.Spider):
         yield dict() if self.completed else response.follow(next_page, callback=self.parse)
 
     def parse_post(self, response):
-        post_id = int(response.url.split("/")[-2])
+        post_url = response.url
+        post_id = int(post_url.split("/")[-2])
         bank_answer_id = f"block_text_{post_id}"
 
         if post_id <= self.last_post_id:
@@ -71,7 +71,8 @@ class BankiruSpider(scrapy.Spider):
                 msg=RegExp.space.sub(" ", RegExp.tag.sub(" ", comment.css("td.article-text").get()).strip())
             ))
 
-        yield PostBankiru() if self.completed else PostBankiru(
+        yield PostBankiru(
+            post_url=post_url,
             post_id=post_id,
             title=title,
             rating=rating,

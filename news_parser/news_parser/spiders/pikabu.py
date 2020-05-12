@@ -4,7 +4,6 @@ from news_parser.settings import SPIDER_URLS
 from datetime import datetime
 import scrapy
 import re
-import json
 
 
 class PikabuSpider(scrapy.Spider):
@@ -13,12 +12,11 @@ class PikabuSpider(scrapy.Spider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.last_post_id = 7260429
+        self.last_post_id = 0
         self.completed = False
 
-    def last_post_id(self, post_id: str):
-        # self.last_post_id = int(post_id)
-        self.last_post_id = 10354130
+    def set_last_post_id(self, post_id: str):
+        self.last_post_id = int(post_id or 7339510)
 
     def parse(self, response):
         posts = response.css("article.story")
@@ -44,7 +42,6 @@ class PikabuSpider(scrapy.Spider):
 
     def parse_post(self, response):
         post_url = response.url
-        print(f"{post_url=}")
         post_id = int(post_url.split("_")[-1])
 
         if post_id <= self.last_post_id:

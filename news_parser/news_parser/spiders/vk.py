@@ -9,11 +9,11 @@ class VKSpider(scrapy.Spider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.last_part = None
-        self.last_ntime = None
+        self.last_part = 0
+        self.last_ntime = 0
         self.completed = False
 
-    def last_post_id(self, post_id: str):
+    def set_last_post_id(self, post_id: str):
         if post_id == "0":
             self.last_part, self.last_ntime = 0, 0
         else:
