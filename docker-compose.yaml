@@ -1,0 +1,33 @@
+version: "3"
+
+volumes:
+  pg-news-parser-volume:
+
+networks:
+  backend:
+
+services:
+  pg-news-parser:
+    build: postgres/
+    container_name: pg-news-parser
+    volumes:
+      - pg-news-parser-volume:/var/lib/postgresql/data
+    restart: always
+    env_file:
+      - ./postgres/postgres.env
+    ports:
+      - 5432:5432
+    networks:
+      - backend
+
+  news_parser:
+    build: news_parser/
+    container_name: news_parser
+    #restart: always
+    env_file:
+      - ./news_parser/news_parser.env
+    networks:
+      - backend
+    depends_on:
+      - pg-news-parser
+    command: ["python", "start.py"]
