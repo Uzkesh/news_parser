@@ -1,4 +1,4 @@
-from news_parser.items import PostBankiru, CommentBankiru
+from news_parser.items import Post, Comment
 from news_parser.common.regexp_template import RegExp
 from news_parser.settings import SPIDER_URLS
 from datetime import datetime
@@ -12,11 +12,12 @@ class BankiruSpider(scrapy.Spider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.last_post_id = 0
+        self.limit_post_id = kwargs.get("limit_post_id", None)
+        self.limit_date = kwargs.get("limit_date", None)
         self.completed = False
 
-    def set_last_post_id(self, post_id: str):
-        self.last_post_id = int(post_id or 11169894)
+    def set_last_post_id(self, post_id: int):
+        self.limit_post_id = self.limit_post_id or post_id
 
     def parse(self, response):
         main = response.css("main.layout-column-center")
@@ -38,12 +39,10 @@ class BankiruSpider(scrapy.Spider):
         yield dict() if self.completed else response.follow(next_page, callback=self.parse)
 
     def parse_post(self, response):
+        out_of_limit = False
         post_url = response.url
         post_id = int(post_url.split("/")[-2])
         bank_answer_id = f"block_text_{post_id}"
-
-        if post_id <= self.last_post_id:
-            self.completed = True
 
         post = response.css("table.resptab")
         author = response.css("table.resptab td.footerline a")
@@ -64,14 +63,18 @@ class BankiruSpider(scrapy.Spider):
             comment_author_uid = comment_author_uid.split("=")[-1] if comment_author_uid else None
             comment_author_login = comment.css("a.userName::text").get() or comment.css("td.userinfo strong::text").get()
 
-            comments_data.append(CommentBankiru(
+            comments_data.append(Comment(
                 author_uid=comment_author_uid,
                 author_login=comment_author_login,
                 datetime=datetime.strptime(comment.css("div.pressmon::text").get(), "%d.%m.%Y %H:%M"),
                 msg=RegExp.space.sub(" ", RegExp.tag.sub(" ", comment.css("td.article-text").get()).strip())
             ))
 
-        yield PostBankiru(
+        if self.limit_date and dt < self.limit_date or self.limit_post_id and post_id <= self.limit_post_id:
+            self.completed = True
+            out_of_limit = True
+
+        yield Post() if out_of_limit else Post(
             post_url=post_url,
             post_id=post_id,
             title=title,

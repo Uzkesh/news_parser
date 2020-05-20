@@ -8,7 +8,7 @@
 from news_parser.common.db_manager import DB, DBParamsDTO
 from news_parser.common.types import DBPostTypesDTO
 from news_parser.common.regexp_template import RegExp
-from news_parser.items import PostBankiru, CommentBankiru
+from news_parser.items import Post, Comment
 from typing import Optional, Union
 import json
 
@@ -213,13 +213,13 @@ class NewsParserPipeline(object):
         )
         return self.db.cur.fetchone()[0]
 
-    def _add_post_info(self, parent_id: Optional[int], account_id: int, post_type: int, item: Union[PostBankiru, CommentBankiru]):
+    def _add_post_info(self, parent_id: Optional[int], account_id: int, post_type: int, item: Union[Post, Comment]):
         _etag = str(NewsParserPipeline._add_post_info.__qualname__)
 
         # TODO: Добавить тег - URL-поста
         # Формирование json для записи в БД в колонку content в зависимости от типа сообщения и ресурса
         type_item = type(item)
-        if type_item is PostBankiru:
+        if type_item is Post:
             content = json.dumps({
                 "post_url": item.get("post_url", None),
                 "title": item["title"],
@@ -227,7 +227,7 @@ class NewsParserPipeline(object):
                 "msg": item["msg"],
                 "bank_answer": item["bank_answer"]
             })
-        elif type_item is CommentBankiru:
+        elif type_item is Comment:
             content = json.dumps({
                 "msg": item["msg"]
             })

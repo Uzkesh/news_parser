@@ -8,13 +8,7 @@
 import scrapy
 
 
-class NewsParserItem(scrapy.Item):
-    # define the fields for your item here like:
-    # name = scrapy.Field()
-    pass
-
-
-class PostBankiru(scrapy.Item):
+class Post(scrapy.Item):
     post_url = scrapy.Field()
     post_id = scrapy.Field()
     title = scrapy.Field()
@@ -27,7 +21,7 @@ class PostBankiru(scrapy.Item):
     comments = scrapy.Field()
 
 
-class CommentBankiru(scrapy.Item):
+class Comment(scrapy.Item):
     author_uid = scrapy.Field()
     author_login = scrapy.Field()
     datetime = scrapy.Field()

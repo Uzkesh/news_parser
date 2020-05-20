@@ -1,4 +1,4 @@
-from news_parser.items import PostBankiru, CommentBankiru
+from news_parser.items import Post, Comment
 from news_parser.common.regexp_template import RegExp
 from news_parser.settings import SPIDER_URLS
 from datetime import datetime
@@ -13,11 +13,15 @@ class BankiruClientsSpider(scrapy.Spider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.last_post_id = 0
+        self.limit_post_id = kwargs.get("limit_post_id", None)
+        self.limit_date = kwargs.get("limit_date", None)
         self.completed = False
 
-    def set_last_post_id(self, post_id: str):
-        self.last_post_id = int(post_id or 10374829)
+    def set_last_post_id(self, post_id: int):
+        # TODO: Разделить на две разные переменные
+        # TODO: Если параметры при запуске не переданы, то работыем до существующей записи в БД
+        # TODO: Но, если были переданы параметры, то работаем по нима (учитывать обновление/пропуск парсинга данных)
+        self.limit_post_id = self.limit_post_id or post_id
 
     def parse(self, response):
         posts = response.css("article.responses__item")
@@ -34,11 +38,9 @@ class BankiruClientsSpider(scrapy.Spider):
         yield dict() if self.completed else response.follow(next_page, callback=self.parse)
 
     def parse_post(self, response):
+        out_of_limit = False
         post_url = response.url
         post_id = int(post_url.split("/")[-2])
-
-        if post_id <= self.last_post_id:
-            self.completed = True
 
         post = response.css("article.response-page")
         answers = response.css("div.response-thread")
@@ -56,7 +58,7 @@ class BankiruClientsSpider(scrapy.Spider):
 
         comments_data = list()
         for comment in comments:
-            comments_data.append(CommentBankiru(
+            comments_data.append(Comment(
                 author_uid=comment.get("authorId", None),
                 author_login=comment["author"],
                 datetime=comment["dateCreate"],
@@ -67,7 +69,11 @@ class BankiruClientsSpider(scrapy.Spider):
                 ))
             ))
 
-        yield PostBankiru(
+        if self.limit_date and dt < self.limit_date or self.limit_post_id and post_id <= self.limit_post_id:
+            self.completed = True
+            out_of_limit = True
+
+        yield Post() if out_of_limit else Post(
             post_url=post_url,
             post_id=post_id,
             title=title,

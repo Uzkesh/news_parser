@@ -1,4 +1,4 @@
-from news_parser.items import PostBankiru, CommentBankiru
+from news_parser.items import Post, Comment
 from news_parser.common.regexp_template import RegExp
 from news_parser.settings import SPIDER_URLS
 from datetime import datetime
@@ -12,11 +12,12 @@ class PikabuSpider(scrapy.Spider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.last_post_id = 0
+        self.limit_post_id = kwargs.get("limit_post_id", None)
+        self.limit_date = kwargs.get("limit_date", None)
         self.completed = False
 
-    def set_last_post_id(self, post_id: str):
-        self.last_post_id = int(post_id or 7339510)
+    def set_last_post_id(self, post_id: int):
+        self.limit_post_id = self.limit_post_id or post_id
 
     def parse(self, response):
         posts = response.css("article.story")
@@ -41,11 +42,9 @@ class PikabuSpider(scrapy.Spider):
         yield dict() if self.completed else response.follow(next_page, callback=self.parse)
 
     def parse_post(self, response):
+        out_of_limit = False
         post_url = response.url
         post_id = int(post_url.split("_")[-1])
-
-        if post_id <= self.last_post_id:
-            self.completed = True
 
         post = response.css("div.page-story div.story__main")
         footer = response.css("div.story__footer")
@@ -56,7 +55,11 @@ class PikabuSpider(scrapy.Spider):
         author_login = footer.css("a.user__nick.story__user-link::text").get()
         dt = datetime.strptime(re.sub(":00$", "00", footer.css("time.caption.story__datetime.hint").attrib["datetime"]), "%Y-%m-%dT%H:%M:%S%z")
 
-        yield PostBankiru(
+        if self.limit_date and dt < self.limit_date or self.limit_post_id and post_id <= self.limit_post_id:
+            self.completed = True
+            out_of_limit = True
+
+        yield Post() if out_of_limit else Post(
             post_url=post_url,
             post_id=post_id,
             title=title,

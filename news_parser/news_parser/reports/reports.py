@@ -79,12 +79,14 @@ class ReportPostAutoParsing:
                 WITH RECURSIVE grouped_posts as (
                   SELECT 1 as level
                        , tpi.id as group_base_id
+                       , tpi.datetime as post_created
                        , tpi.*
                     FROM t_post_info tpi
                    WHERE parent_id IS NULL
                    UNION ALL
                   SELECT gp.level + 1 as level
                        , gp.group_base_id
+                       , gp.post_created
                        , tpi.*
                     FROM t_post_info tpi
                    INNER JOIN grouped_posts gp
@@ -126,7 +128,7 @@ class ReportPostAutoParsing:
                                ON gp.ref_type = rt.id
                          INNER JOIN ref_source rs
                                ON gp.ref_source = rs.id
-                         ORDER BY rs.name, gp.group_base_id, gp.level, gp.datetime) vt1
+                         ORDER BY rs.name, gp.post_created, gp.group_base_id, gp.level, gp.datetime) vt1
             """),
             {"p_type_id": self.type_id}
         )
