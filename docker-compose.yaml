@@ -20,6 +20,15 @@ services:
     networks:
       - backend
 
+  redis:
+    image: redis:latest
+      container_name: redis
+      ports:
+        - "6379:6379"
+      restart: always
+      networks:
+        - backend
+
   news_parser:
     build: news_parser/
     container_name: news_parser
@@ -30,4 +39,6 @@ services:
       - backend
     depends_on:
       - pg-news-parser
-    command: ["python", "start.py"]
+      - redis
+#    command: ["python", "start.py"]
+    command: ["celery", "-A", "tasks", "worker", "--beat"]
