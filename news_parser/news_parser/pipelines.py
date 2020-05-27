@@ -56,30 +56,15 @@ class NewsParserPipeline(object):
         if len(item.keys()) > 0:
             self._current_post_id = item.get("post_id", None)
 
-            if spider.name == "vk":
-                pass
-                # self.db.cur.execute(
-                #     RegExp.space.sub(" ", """
-                #         INSERT INTO t_vk_posts(part, ntime, msg)
-                #         VALUES (:p_part, :p_ntime, :p_msg)
-                #     """),
-                #     {
-                #         "p_part": item["part"],
-                #         "p_ntime": item["ntime"],
-                #         "p_msg": item["msg"]
-                #     }
-                # )
-
-            elif spider.name == "bankiru" or spider.name == "bankiru_clients" or spider.name == "pikabu":
-                # try:
-                    self._save_post_info(
-                        parent_id=None,
-                        post_type=self._post_types.post,
-                        item=item,
-                        comments=item.get("comments", list())
-                    )
-                # except PipelineException as e:
-                #     print(str(e))
+            # try:
+            self._save_post_info(
+                parent_id=None,
+                post_type=self._post_types.post,
+                item=item,
+                comments=item.get("comments", list())
+            )
+            # except PipelineException as e:
+            #     print(str(e))
 
         return item
 
