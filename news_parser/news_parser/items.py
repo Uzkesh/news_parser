@@ -26,3 +26,8 @@ class Comment(scrapy.Item):
     author_login = scrapy.Field()
     datetime = scrapy.Field()
     msg = scrapy.Field()
+    comments = scrapy.Field()
+
+
+class PostContainer(scrapy.Item):
+    data = scrapy.Field()

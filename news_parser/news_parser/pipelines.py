@@ -8,7 +8,7 @@
 from news_parser.common.db_manager import DB, DBParamsDTO
 from news_parser.common.types import DBPostTypesDTO
 from news_parser.common.regexp_template import RegExp
-from news_parser.items import Post, Comment
+from news_parser.items import Post, Comment, PostContainer
 from typing import Optional, Union
 import json
 
@@ -54,19 +54,19 @@ class NewsParserPipeline(object):
 
     def process_item(self, item, spider):
         if len(item.keys()) > 0:
-            self._current_post_id = item.get("post_id", None)
+            self.process_each_items(item["data"] if type(item) is PostContainer else [item])
 
-            # try:
+        return item
+
+    def process_each_items(self, items: list):
+        for item in items:
+            self._current_post_id = item.get("post_id", None)
             self._save_post_info(
                 parent_id=None,
                 post_type=self._post_types.post,
                 item=item,
                 comments=item.get("comments", list())
             )
-            # except PipelineException as e:
-            #     print(str(e))
-
-        return item
 
     def _save_post_info(self, parent_id: Optional[int], post_type: int, item, comments: list):
         _etag = str(NewsParserPipeline._save_post_info.__qualname__)

@@ -1,10 +1,12 @@
 from news_parser.common.db_manager import DB, DBParamsDTO
 from news_parser.common.regexp_template import RegExp
 from news_parser.settings import DB_PARAMS
-from typing import NamedTuple, Union, Optional
+from typing import NamedTuple, Union, Optional, Tuple, Set
 from datetime import datetime
 from openpyxl import Workbook as excel_wb
+from functools import reduce
 import json
+import re
 
 
 class ReportException(Exception):
@@ -162,7 +164,7 @@ class ReportPostAutoParsing:
         sheet.title = f"Отчет за {current_date.strftime('%d.%m.%Y %H-%M-%S')}"
         header = [
             "id", "Ресурс", "Пользователь", "URL", "Заголовок", "Сообщение",
-            "Комментарий", "Ответ Банка", "Рейтинг", "Дата"
+            "Комментарий", "Ответ Банка", "Рейтинг", "Дата", "Ключевые слова"
         ]
 
         nrow = 1
@@ -174,7 +176,11 @@ class ReportPostAutoParsing:
         for row in gr:
             nrow += 1
             ids.append(row[0])
-            for i, val in enumerate(row, 1):
+
+            keywords = self._search_keywords(row[5:8])
+            keywords_str = reduce(lambda x, y: f"{x}, {y}", keywords) if len(keywords) > 0 else None
+
+            for i, val in enumerate(list(row) + [keywords_str], 1):
                 sheet.cell(nrow, i).value = val
 
         fname = f"{self.type_code}_{current_date.strftime('%Y%m%d%H%M%S')}.xlsx"
@@ -200,6 +206,28 @@ class ReportPostAutoParsing:
             """)
         )
         return (self.db.cur.fetchone() or [None])[0]
+
+    def _search_keywords(self, texts: Tuple[str]) -> Set[str]:
+        keywords = [
+            "мрот", "зарплат", "район", "коэф", "надбавк", "рк", "%", "счет", "счёт", "тариф", "рко",
+            "комисс", "стандарт"
+        ]
+        keywords_num = ["12130", "422"]
+        keywords_reduction = ["рк", "рко", "аст"]
+        keywords_word = [
+            "мрот", "зарплат", "район", "коэф", "надбавк", "%", "счет", "счёт", "тариф", "комисс", "стандарт",
+            "сбербанк", "гаранти", "электронная площадка"
+        ]
+
+        res = set()
+        for text in texts:
+            ltext = (text or "").lower()
+            res_num = {item for item in keywords_num if type(re.search(f"[^0-9]{item}[^0-9]", ltext)) is re.Match}
+            res_reduction = {item for item in keywords_reduction if type(re.search(f"[^0-9a-zа-я]{item}[^0-9a-zа-я]", ltext)) is re.Match}
+            res_word = {item for item in keywords_word if ltext.find(item) >= 0}
+            res |= res_num | res_reduction | res_word
+
+        return res
 
     def remake_report_file(self, report_id: int):
         # TODO: Сгенерировать файл из ранее сохраненного в БД отчета

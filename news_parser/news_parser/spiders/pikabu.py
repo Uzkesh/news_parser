@@ -55,7 +55,7 @@ class PikabuSpider(scrapy.Spider):
         author_login = footer.css("a.user__nick.story__user-link::text").get()
         dt = datetime.strptime(re.sub(":00$", "00", footer.css("time.caption.story__datetime.hint").attrib["datetime"]), "%Y-%m-%dT%H:%M:%S%z")
 
-        if self.limit_date and dt < self.limit_date or self.limit_post_id and post_id <= self.limit_post_id:
+        if self.limit_date and datetime.strptime(dt.strftime("%Y-%m-%d"), "%Y-%m-%d") < self.limit_date or self.limit_post_id and post_id <= self.limit_post_id:
             self.completed = True
             out_of_limit = True
 

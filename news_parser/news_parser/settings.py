@@ -110,3 +110,7 @@ EMAIL_MANAGER = {
     "login": os.environ["EMAIL_MANAGER_LOGIN"],
     "password": os.environ["EMAIL_MANAGER_PASSWORD"]
 }
+
+TOKENS = {
+    "vk": os.environ["TOKEN_VK"]
+}
