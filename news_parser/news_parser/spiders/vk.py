@@ -1,7 +1,7 @@
 from news_parser.settings import SPIDER_URLS, TOKENS
 from news_parser.items import Post, Comment, PostContainer
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
 import scrapy
 import re
 import vk
@@ -18,43 +18,25 @@ class VKSpider(scrapy.Spider):
         self.api_version = 5.107
         # TODO: Получать из БД список каналов (доработать структуру ref_source)
         self.sources = [-84354128]
+        self.offset = 0
         self.count = 100
-        self.last_part = 0
-        self.last_ntime = 0
-        self.completed = False
 
-    def set_last_post_id(self, post_id: int):
-        if post_id is None:
-            self.last_part, self.last_ntime = 0, 0
-        # else:
-        #     str_post_id = str(post_id)
-        #     cnt = int(str_post_id[-1])
-        #     self.last_part = int(str_post_id[:cnt])
-        #     self.last_ntime = int(str_post_id[cnt:-1])
+    def set_last_post_id(self, post_id: int) -> None:
+        pass
 
-    # TODO: Убрать переходы по страницам - оставить только цикл
-    def parse(self, response):
-        url = response.url
-        url_parts = url.split("?")
-        base_url = url_parts[0]
-        if len(url_parts) > 1:
-            offset = int((re.search(r"offset=(\d)+", url_parts[1]) or ["=0"])[0].split("=")[1])
-            count = int((re.search(r"count=(\d)+", url_parts[1]) or ["=100"])[0].split("=")[1])
-        else:
-            offset = 0
-            count = 100
+    def parse(self, response) -> PostContainer:
+        completed = False
+        offset = self.offset
 
-        next_offset = offset + count
-        next_page = f"{base_url}?offset={next_offset}&count={count}"
-
-        # TODO: надо сделать флаг completed для каждого source отдельно
+        # TODO: надо сделать флаг completed (и offset, и count ?) для каждого source отдельно
         for source in self.sources:
-            if not self.completed:
-                yield PostContainer(data=self.parse_posts(owner_id=source, offset=offset, count=count))
+            while not completed:
+                completed, posts = self.parse_posts(owner_id=source, offset=offset, count=self.count)
+                offset += self.count
+                yield PostContainer(data=posts)
 
-        yield dict() if self.completed else response.follow(next_page, callback=self.parse)
-
-    def parse_posts(self, owner_id: int, offset: int, count: int) -> list:
+    def parse_posts(self, owner_id: int, offset: int, count: int) -> Tuple[bool, list]:
+        completed = False
         res = list()
 
         posts_info = self.api.wall.get(
@@ -72,8 +54,7 @@ class VKSpider(scrapy.Spider):
         for post in posts:
             post_date = datetime.fromtimestamp(post["date"])
 
-            if self.limit_date and post_date < self.limit_date:
-                self.completed = True
+            if completed := self.limit_date and post_date < self.limit_date:
                 break
 
             res.append(Post(
@@ -86,24 +67,12 @@ class VKSpider(scrapy.Spider):
                 author_uid=post["from_id"],
                 author_login=profiles[post["from_id"]],
                 datetime=post_date,
-                comments=self.parse_comments(
-                    owner_id=owner_id,
-                    post_id=post["id"],
-                    comment_id=None,
-                    offset=0,
-                    count=100
-                )
+                comments=self.parse_comments(owner_id=owner_id, post_id=post["id"], comment_id=None)
             ))
 
-        # if len(res) == count:
-        #     res += self.parse_posts(
-        #         owner_id=owner_id,
-        #         offset=offset + count
-        #     )
+        return completed or len(posts) == 0, res
 
-        return res
-
-    def parse_comments(self, owner_id: int, post_id: int, comment_id: Optional[int], offset: int, count: int) -> list:
+    def parse_comments(self, owner_id: int, post_id: int, comment_id: Optional[int], offset=0, count=100) -> list:
         res = list()
 
         comments_info = self.api.wall.getComments(
@@ -131,9 +100,7 @@ class VKSpider(scrapy.Spider):
                     comments=self.parse_comments(
                         owner_id=owner_id,
                         post_id=post_id,
-                        comment_id=comment["id"],
-                        offset=0,
-                        count=count
+                        comment_id=comment["id"]
                     ) if comment.get("thread", {"count": 0})["count"] > 0 else list()
                 ))
 
@@ -143,8 +110,7 @@ class VKSpider(scrapy.Spider):
                 owner_id=owner_id,
                 post_id=post_id,
                 comment_id=comment_id,
-                offset=offset + count,
-                count=count
+                offset=offset + count
             )
 
         return res
